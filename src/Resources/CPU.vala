@@ -38,7 +38,7 @@ public class Monitor.CPU : Object {
     public double frequency {
         get {
             // Convert kHz to GHz
-            return (double) (_frequency / 1000000);
+            return _frequency / 1000000;
         }
     }
     public double temperature_mean {
@@ -132,48 +132,43 @@ public class Monitor.CPU : Object {
 
     // From https://github.com/PlugaruT/wingpanel-monitor/blob/edcfea6a31f794aa44da6d8b997378ea1a8d8fa3/src/Services/Cpu.vala#L61-L85
     private void update_frequency () {
-        // using harmonic mean to calculate frequency values
-        double inverse_sum = 0;
-        double freq_value = 0 ;
 
-        int core_total_number = (int) get_num_processors ();
+        uint64 core_total_number = GTop.glibtop_get_sysinfo ().ncpu;
 
-        for (uint cpu_id = 0; cpu_id < core_total_number; ++cpu_id) {
-            string cur_content;
+        string content;
+        double min_frequency = 0d;
+        double total_frequency = 0d;
+        int number_above_min = 0;
+
+        for (int i = 0; i < core_total_number; i++) {
             try {
-                FileUtils.get_contents ("/sys/devices/system/cpu/cpu%u/cpufreq/scaling_cur_freq".printf (cpu_id), out cur_content);
-            } catch (Error e) {
+                FileUtils.get_contents ("/sys/devices/system/cpu/cpu%u/cpufreq/scaling_cur_freq".printf (i), out content);
+            } catch (Error e){
                 warning (e.message);
-                cur_content = "0";
+                content = "0";
             }
-            freq_value = double.parse (cur_content);
-            inverse_sum += 1 / freq_value;
+
+            double frequency = double.parse (content);
+
+            if (min_frequency == 0d) {
+                min_frequency = frequency;
+            }
+
+            if (frequency > min_frequency + 200000) {
+                number_above_min += 1;
+                total_frequency += frequency;
+            }
+
+            if (frequency < min_frequency) {
+                min_frequency = frequency;
+            }
         }
-        _frequency = (double) core_total_number / inverse_sum ;
+
+        double average_scaled_frequency = total_frequency / number_above_min;
+
+        _frequency = average_scaled_frequency;
     }
 
-    // private void get_cache () {
-    // double maxcur = 0;
-    // for (uint cpu_id = 0, isize = (int) get_num_processors (); cpu_id < isize; ++cpu_id) {
-    // string cur_content;
-    // try {
-    // FileUtils.get_contents ("/sys/devices/system/cpu/cpu%u/cpufreq/scaling_cur_freq".printf (cpu_id), out cur_content);
-    // } catch (Error e) {
-    // warning (e.message);
-    // cur_content = "0";
-    // }
-
-    // var cur = double.parse (cur_content);
-
-    // if (cpu_id == 0) {
-    // maxcur = cur;
-    // } else {
-    // maxcur = double.max (cur, maxcur);
-    // }
-    // }
-
-    // _frequency = (double) maxcur;
-    // }
 
     private void parse_cpuinfo () {
         unowned GTop.SysInfo ? info = GTop.glibtop_get_sysinfo ();
