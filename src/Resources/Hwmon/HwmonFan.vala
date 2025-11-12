@@ -6,7 +6,7 @@
 // This struct holds paths to temperature data
 // Learn more: https://www.kernel.org/doc/html/v5.11/gpu/amdgpu.html#hwmon-interfaces
 
-public class Monitor.HwmonFan : Object {
+public class Monitor.HwmonFan {
     // fan speed in RPM
     public string input;
 
